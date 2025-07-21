@@ -28,7 +28,14 @@ const handleClose = uuid => {
 
 const handleMessage = (bytes, uuid) => {
 
-    const message = JSON.parse(bytes.toString());
+    let message;
+    try {
+        // if data is Buffer or stringified JSON string
+        message = JSON.parse(bytes.toString());
+    } catch (err) {
+        console.error("Failed to parse message:", bytes.toString());
+        return;
+    }
     const user = users[uuid];
     user.state = message;
     console.log(`${user.username} updated their state to ${JSON.stringify(user.state)}`);
