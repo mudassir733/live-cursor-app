@@ -11,7 +11,7 @@ export const SOCKET_STATES = {
 };
 
 // Custom hook for WebSocket connection
-export const useSocket = (username, options = {}) => {
+export const useSocket = (username, roomId, options = {}) => {
   const {
     autoConnect = true,
     reconnectAttempts = 5,
@@ -33,8 +33,8 @@ export const useSocket = (username, options = {}) => {
 
   // Connect to WebSocket
   const connect = useCallback(() => {
-    if (!username) {
-      console.warn('⚠️ Cannot connect: Username is required');
+    if (!username || !roomId) {
+      console.warn('⚠️ Cannot connect: Username and roomId are required');
       return;
     }
 
@@ -48,7 +48,7 @@ export const useSocket = (username, options = {}) => {
       setConnectionError(null);
       isManuallyClosedRef.current = false;
 
-      const wsUrl = getWebSocketUrl(username);
+      const wsUrl = getWebSocketUrl(username, roomId);
       console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
       
       socketRef.current = new WebSocket(wsUrl);

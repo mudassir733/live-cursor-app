@@ -7,6 +7,7 @@ const cors = require('cors');
 const eventEmitter = require('./events/EventEmitter');
 const SocketEventHandler = require('./events/socketEvents');
 const userRoutes = require('./routes/userRoutes');
+const cursorRoutes = require('./routes/cursorRoutes');
 
 class App {
     constructor() {
@@ -52,6 +53,7 @@ class App {
 
         // API routes
         this.app.use('/api/users', userRoutes);
+this.app.use('/api/cursors', cursorRoutes);
 
         // Root endpoint
         this.app.get('/', (req, res) => {

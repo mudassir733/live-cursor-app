@@ -59,8 +59,8 @@ export const useOnlineUsers = (options = {}) => {
     queryKey: queryKeys.users.online(),
     queryFn: () => apiMethods.user.getOnlineUsers(),
     select: (response) => extractApiData(response).users,
-    refetchInterval: 5000, // Refetch every 5 seconds
-    staleTime: 1000 * 30, // 30 seconds
+    refetchInterval: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 5, 
     ...options,
   });
 };

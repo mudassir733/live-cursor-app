@@ -121,8 +121,8 @@ export const apiMethods = {
 };
 
 // WebSocket URL
-export const getWebSocketUrl = (username) => {
-  const params = new URLSearchParams({ username });
+export const getWebSocketUrl = (username, roomId) => {
+  const params = new URLSearchParams({ username, roomId });
   return `${WS_BASE_URL}?${params.toString()}`;
 };
 
@@ -143,5 +143,11 @@ export const handleApiError = (error) => {
 export const extractApiData = (response) => {
   return response.data;
 };
+
+// Fetch all cursors for a room from backend
+export async function fetchAllCursors(roomId) {
+  const res = await api.get(`/api/cursors/${roomId}`);
+  return res.data.cursors;
+}
 
 export default api;

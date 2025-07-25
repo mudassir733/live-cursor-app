@@ -1,12 +1,15 @@
 const User = require('../models/User');
 const eventEmitter = require('./EventEmitter');
+const cursorStateManager = require('./CursorStateManager');
 
 class SocketEventHandler {
     constructor() {
         this.connections = new Map();
         this.users = new Map();
+        this.sessionRooms = new Map(); // sessionId -> roomId
         this.setupEventListeners();
     }
+
 
     setupEventListeners() {
         // Listen to internal events
@@ -20,51 +23,30 @@ class SocketEventHandler {
     // WebSocket connection handler
     async handleConnection(connection, request) {
         try {
-            const { username } = this.parseQuery(request.url);
-            
-            if (!username) {
-                connection.close(1008, 'Username is required');
+            const { username, roomId } = this.parseQuery(request.url);
+            if (!username || !roomId) {
+                connection.close(1008, 'Username and roomId required');
                 return;
             }
-
             const sessionId = this.generateSessionId();
-            
-            // Create or update user in database
-            const user = await User.createOrUpdateUser({
-                username,
-                sessionId
-            });
-
-            // Store connection and user data
+            // DB: only for presence
+            const user = await User.createOrUpdateUser({ username, sessionId });
             this.connections.set(sessionId, connection);
             this.users.set(sessionId, user);
-
-            // Set up connection event listeners
+            this.sessionRooms.set(sessionId, roomId); // Track roomId for this session
+            // Add to room
+            cursorStateManager.joinRoom(roomId, sessionId);
             this.setupConnectionListeners(connection, sessionId, user);
-
-            // Emit user connected event
-            eventEmitter.emitUserConnected({
-                sessionId,
-                username: user.username,
-                userId: user._id
-            });
-
-            // Send initial data to the connected user
+            eventEmitter.emitUserConnected({ sessionId, username: user.username, userId: user._id });
+            // Send initial state (all cursors in room)
             this.sendToConnection(connection, {
                 type: 'connection:success',
                 data: {
                     sessionId,
                     user: user.toJSON(),
-                    onlineUsers: await this.getOnlineUsers()
+                    cursors: cursorStateManager.getCursors(roomId)
                 }
             });
-
-            // Broadcast user list update
-            eventEmitter.emitBroadcastUpdate({
-                type: 'users:update',
-                data: await this.getOnlineUsers()
-            });
-
         } catch (error) {
             console.error('Error handling connection:', error);
             eventEmitter.emitError(error, { context: 'handleConnection' });
@@ -77,11 +59,9 @@ class SocketEventHandler {
         connection.on('message', (message) => {
             this.handleMessage(message, sessionId, user);
         });
-
         connection.on('close', () => {
             this.handleClose(sessionId, user);
         });
-
         connection.on('error', (error) => {
             console.error(`Connection error for user ${user.username}:`, error);
             eventEmitter.emitError(error, { 
@@ -90,9 +70,7 @@ class SocketEventHandler {
                 username: user.username 
             });
         });
-
         connection.on('pong', () => {
-            // Update last seen when receiving pong
             this.updateUserLastSeen(sessionId);
         });
     }
@@ -100,6 +78,7 @@ class SocketEventHandler {
     // Handle incoming messages
     async handleMessage(bytes, sessionId, user) {
         try {
+            const roomId = this.sessionRooms.get(sessionId);
             let message;
             try {
                 message = JSON.parse(bytes.toString());
@@ -112,11 +91,7 @@ class SocketEventHandler {
                 });
                 return;
             }
-
-            // Update user's last seen
             await this.updateUserLastSeen(sessionId);
-
-            // Handle different message types
             switch (message.type) {
                 case 'cursor:move':
                     await this.handleCursorMove(message.data, sessionId, user);
@@ -148,25 +123,12 @@ class SocketEventHandler {
     // Handle cursor movement
     async handleCursorMove(cursorData, sessionId, user) {
         try {
-            // Update user's cursor state in database
-            await user.updateCursorState(cursorData);
-
-            // Emit cursor move event
-            eventEmitter.emitCursorMove(
-                { sessionId, username: user.username, userId: user._id },
-                cursorData
-            );
-
-            // Broadcast to all other users
-            this.broadcastToOthers(sessionId, {
-                type: 'cursor:move',
-                data: {
-                    sessionId,
-                    username: user.username,
-                    cursor: cursorData
-                }
-            });
-
+            const roomId = this.sessionRooms.get(sessionId);
+            // Store in memory and publish to Redis
+            cursorStateManager.setCursor(roomId, sessionId, cursorData);
+            // Broadcast to all others in room (handled by pub/sub)
+            // Emitting event for local listeners
+            eventEmitter.emitCursorMove({ sessionId, username: user.username, userId: user._id }, cursorData);
         } catch (error) {
             eventEmitter.emitError(error, { 
                 context: 'handleCursorMove', 
@@ -179,21 +141,9 @@ class SocketEventHandler {
     // Handle cursor updates
     async handleCursorUpdate(cursorData, sessionId, user) {
         try {
-            // Update user's cursor state in database
-            await user.updateCursorState(cursorData);
-
-            // Emit cursor update event
-            eventEmitter.emitCursorUpdate(
-                { sessionId, username: user.username, userId: user._id },
-                cursorData
-            );
-
-            // Broadcast updated user list
-            eventEmitter.emitBroadcastUpdate({
-                type: 'users:update',
-                data: await this.getOnlineUsers()
-            });
-
+            const roomId = this.sessionRooms.get(sessionId);
+            cursorStateManager.setCursor(roomId, sessionId, cursorData);
+            eventEmitter.emitCursorUpdate({ sessionId, username: user.username, userId: user._id }, cursorData);
         } catch (error) {
             eventEmitter.emitError(error, { 
                 context: 'handleCursorUpdate', 
@@ -217,26 +167,30 @@ class SocketEventHandler {
     // Handle connection close
     async handleClose(sessionId, user) {
         try {
-            // Update user status in database
+            const roomId = this.sessionRooms.get(sessionId);
+            // Get last cursor state from Redis
+            let lastCursor = null;
+            if (roomId && user._id) {
+                const cursorStr = await require('../config/redis').redisPub.hget(`cursors:${roomId}`, user._id.toString());
+                if (cursorStr) {
+                    try { lastCursor = JSON.parse(cursorStr); } catch {}
+                }
+            }
+            // Persist last x/y to DB if available
+            if (lastCursor && typeof lastCursor.x === 'number' && typeof lastCursor.y === 'number') {
+                user.cursorState = { x: lastCursor.x, y: lastCursor.y };
+                await user.save();
+            }
             await user.setOffline();
-
-            // Clean up local storage
             this.connections.delete(sessionId);
             this.users.delete(sessionId);
-
-            // Emit user disconnected event
+            this.sessionRooms.delete(sessionId);
+            cursorStateManager.leaveRoom(roomId, sessionId);
             eventEmitter.emitUserDisconnected({
                 sessionId,
                 username: user.username,
                 userId: user._id
             });
-
-            // Broadcast updated user list
-            eventEmitter.emitBroadcastUpdate({
-                type: 'users:update',
-                data: await this.getOnlineUsers()
-            });
-
         } catch (error) {
             console.error('Error handling close:', error);
             eventEmitter.emitError(error, { 
@@ -289,11 +243,24 @@ class SocketEventHandler {
         }
     }
 
+    // In-memory lock to serialize saves per user
+    userSaveLocks = new Map();
+
     async updateUserLastSeen(sessionId) {
         const user = this.users.get(sessionId);
         if (user) {
-            user.lastSeen = new Date();
-            await user.save();
+            // Prevent concurrent saves for the same user
+            if (this.userSaveLocks.get(user._id)) {
+                // If a save is already in progress, skip this update
+                return;
+            }
+            this.userSaveLocks.set(user._id, true);
+            try {
+                user.lastSeen = new Date();
+                await user.save();
+            } finally {
+                this.userSaveLocks.delete(user._id);
+            }
         }
     }
 

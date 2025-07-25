@@ -2,13 +2,22 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { Cursor } from "@/components/cursor";
+import { fetchAllCursors } from "@/lib/api";
 import { useOnlineUsers } from "@/hooks/useUserApi";
 import { useSocket, useCursorEvents } from "@/hooks/useSocket";
 
+import { useSearchParams } from "next/navigation";
+
 export default function Home() {
+  // Always call hooks in the same order, at the top
   const [username, setUsername] = useState(null);
   const [userId, setUserId] = useState(null);
-  const [cursors, setCursors] = useState({});
+  const [cursors, setCursors] = useState([]); // [{ userId, username, x, y }]
+  const searchParams = useSearchParams();
+  const roomId = searchParams.get("room") || "default"; // fallback to 'default' room
+  const socket = useSocket(username, roomId);
+  const { sendCursorMove } = useCursorEvents(socket, userId);
+  const { data: onlineUsers, isLoading: loadingUsers } = useOnlineUsers();
 
   // Get current user info from localStorage
   useEffect(() => {
@@ -22,35 +31,58 @@ export default function Home() {
     }
   }, []);
 
-  // WebSocket connection
-  const socket = useSocket(username);
-  const { sendCursorMove } = useCursorEvents(socket, userId);
 
-  // Online users query
-  const { data: onlineUsers, isLoading: loadingUsers } = useOnlineUsers();
+  // Real-time: update cursors from WebSocket events
+  useEffect(() => {
+    if (!username || !userId) return;
+    if (!socket || !socket.lastMessage) return;
+    if (
+      socket.lastMessage.type === "cursors:update" ||
+      socket.lastMessage.type === "connection:success"
+    ) {
+      // Expect an array: [{ userId, username, x, y }]
+      setCursors(socket.lastMessage.data?.cursors || []);
+    }
+  }, [username, userId, socket, socket?.lastMessage]);
 
-  // Handle real-time cursor broadcasting
+
+
+
+
+  // Throttle function
+  function throttle(fn, wait) {
+    let last = 0;
+    return (...args) => {
+      const now = Date.now();
+      if (now - last > wait) {
+        last = now;
+        fn(...args);
+      }
+    };
+  }
+  // Handle real-time cursor broadcasting (throttled)
   useEffect(() => {
     if (!socket.isConnected || !userId) return;
-    const handleMove = (e) => {
-      sendCursorMove({ userId, x: e.clientX, y: e.clientY });
-    };
-    window.addEventListener("mousemove", handleMove);
-    return () => window.removeEventListener("mousemove", handleMove);
-  }, [socket.isConnected, userId, sendCursorMove]);
+    const throttledMove = throttle((e) => {
+      sendCursorMove({ userId, username, x: e.clientX, y: e.clientY });
+    }, 30);
+    window.addEventListener("mousemove", throttledMove);
+    return () => window.removeEventListener("mousemove", throttledMove);
+  }, [socket.isConnected, userId, username, sendCursorMove]);
 
   // Listen for cursor updates from socket
   useEffect(() => {
     if (!socket.lastMessage) return;
-    if (socket.lastMessage.type === "cursors:update") {
-      setCursors(socket.lastMessage.data); // { userId: { x, y, username } }
+    if (socket.lastMessage.type === "cursors:update" || socket.lastMessage.type === "connection:success") {
+      // Expect an array: [{ userId, username, x, y }]
+      setCursors(socket.lastMessage.data?.cursors || []);
     }
   }, [socket.lastMessage]);
 
-  if (!username) {
+  if (!username || !userId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Redirecting to login...</p>
+        <p>Loading...</p>
       </div>
     );
   }
@@ -76,13 +108,46 @@ export default function Home() {
           </div>
         )}
       </div>
-      {/* Render all cursors */}
-      {Object.keys(cursors).map((uid) => {
-        const c = cursors[uid];
-        return (
-          <Cursor key={uid} point={[c.x, c.y]} />
-        );
-      })}
+      {/* Render all cursors (Figma/Miro style) */}
+      {cursors.map((c, idx) => (
+        <div
+          key={c.userId || `${c.username}-${idx}`}
+          style={{
+            position: "absolute",
+            left: c.x,
+            top: c.y,
+            zIndex: c.userId === userId ? 20 : 10,
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <Cursor
+            point={[0, 0]}
+            color={c.userId === userId ? "#6366f1" : "#f43f5e"}
+            size={36}
+            shadow={c.userId === userId}
+          />
+          <span
+            style={{
+              marginLeft: 8,
+              background: c.userId === userId ? "#6366f1" : "#f43f5e",
+              color: "white",
+              fontWeight: 600,
+              borderRadius: 6,
+              padding: "2px 8px",
+              fontSize: 14,
+              boxShadow: c.userId === userId ? "0 2px 8px #6366f180" : "0 2px 8px #f43f5e40",
+              border: c.userId === userId ? "2px solid #6366f1" : "2px solid #f43f5e",
+              position: "relative",
+              top: 0,
+            }}
+          >
+            {c.username}
+          </span>
+        </div>
+      ))}
       {/* Greeting */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white/80 rounded-xl px-8 py-4 shadow text-center">
         <h1 className="text-2xl font-bold text-gray-900">Hello, {username}</h1>

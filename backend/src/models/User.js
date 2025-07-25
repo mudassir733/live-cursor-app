@@ -65,18 +65,31 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-// Indexes for better performance
-userSchema.index({ username: 1 });
-userSchema.index({ email: 1 });
-userSchema.index({ sessionId: 1 });
-userSchema.index({ isOnline: 1 });
 
 // Instance methods
-userSchema.methods.updateCursorState = function(newState) {
-    this.cursorState = { ...this.cursorState, ...newState };
-    this.lastSeen = new Date();
-    return this.save();
-};
+// In-memory save queue for updateCursorState
+const updateCursorQueues = new Map();
+userSchema.methods.updateCursorState = async function(newState) {
+    try {
+      await this.constructor.updateOne(
+        { _id: this._id },
+        {
+          $set: {
+            ...Object.entries(newState).reduce((acc, [key, val]) => {
+              acc[`cursorState.${key}`] = val;
+              return acc;
+            }, {}),
+            lastSeen: new Date()
+          }
+        }
+      );
+      // Update local instance to stay in sync (optional)
+      Object.assign(this.cursorState, newState);
+      this.lastSeen = new Date();
+    } catch (err) {
+      console.error('updateCursorState error:', err);
+    }
+  };
 
 userSchema.methods.setOnline = function(sessionId) {
     this.isOnline = true;
