@@ -1,54 +1,33 @@
-// components/Cursor
-"use client"
-import { useRef, useCallback } from "react"
-import React from "react"
-import { usePerfectCursor } from "../hooks/useCursor"
+import { usePerfectCursor } from "../hooks/useCursor";
+import { useEffect, useRef } from "react";
 
-export function Cursor({ point, color = "#6366f1", size = 36, shadow = false }) {
-    const rCursor = useRef(null)
+export function Cursor({ point, color, size, shadow }) {
+    const cursorRef = useRef(null);
 
-    const animateCursor = useCallback((point) => {
-        const elm = rCursor.current
-        if (!elm) return
-        elm.style.setProperty(
-            "transform",
-            `translate(${point[0]}px, ${point[1]}px)`
-        )
-    }, [])
+    const onPointChange = usePerfectCursor((point) => {
+        if (cursorRef.current) {
+            cursorRef.current.style.left = `${point[0]}px`;
+            cursorRef.current.style.top = `${point[1]}px`;
+        }
+    }, point);
 
-    const onPointMove = usePerfectCursor(animateCursor)
-
-    React.useLayoutEffect(() => onPointMove(point), [onPointMove, point])
+    useEffect(() => {
+        onPointChange(point);
+    }, [point, onPointChange]);
 
     return (
-        <svg
-            ref={rCursor}
+        <div
+            ref={cursorRef}
             style={{
                 position: "absolute",
-                top: -size / 2,
-                left: -size / 2,
                 width: size,
                 height: size,
-                filter: shadow ? `drop-shadow(0 2px 8px ${color}80)` : undefined,
-                transition: "filter 0.2s, width 0.2s, height 0.2s",
+                backgroundColor: color,
+                borderRadius: "50%",
+                transform: "translate(-50%, -50%)",
+                boxShadow: shadow ? "0 2px 8px rgba(0, 0, 0, 0.2)" : "none",
+                pointerEvents: "none",
             }}
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 35 35"
-            fill="none"
-            fillRule="evenodd"
-        >
-            <g fill="rgba(0,0,0,.2)" transform="translate(1,1)">
-                <path d="m12 24.4219v-16.015l11.591 11.619h-6.781l-.411.124z" />
-                <path d="m21.0845 25.0962-3.605 1.535-4.682-11.089 3.686-1.553z" />
-            </g>
-            <g fill="white">
-                <path d="m12 24.4219v-16.015l11.591 11.619h-6.781l-.411.124z" />
-                <path d="m21.0845 25.0962-3.605 1.535-4.682-11.089 3.686-1.553z" />
-            </g>
-            <g fill={color}>
-                <path d="m19.751 24.4155-1.844.774-3.1-7.374 1.841-.775z" />
-                <path d="m13 10.814v11.188l2.969-2.866.428-.139h4.768z" />
-            </g>
-        </svg>
-    )
+        />
+    );
 }

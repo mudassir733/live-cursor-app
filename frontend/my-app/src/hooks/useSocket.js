@@ -20,12 +20,14 @@ export const useSocket = (username, roomId, options = {}) => {
     onDisconnect,
     onError,
     onMessage,
+
+
   } = options;
 
   const [connectionState, setConnectionState] = useState(SOCKET_STATES.DISCONNECTED);
   const [lastMessage, setLastMessage] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
-  
+
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
@@ -50,7 +52,7 @@ export const useSocket = (username, roomId, options = {}) => {
 
       const wsUrl = getWebSocketUrl(username, roomId);
       console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
-      
+
       socketRef.current = new WebSocket(wsUrl);
 
       socketRef.current.onopen = (event) => {
@@ -75,16 +77,16 @@ export const useSocket = (username, roomId, options = {}) => {
       socketRef.current.onclose = (event) => {
         console.log('🔌 WebSocket connection closed:', event.code, event.reason);
         setConnectionState(SOCKET_STATES.DISCONNECTED);
-        
+
         onDisconnect?.(event);
 
         // Attempt to reconnect if not manually closed
         if (!isManuallyClosedRef.current && reconnectAttemptsRef.current < reconnectAttempts) {
           setConnectionState(SOCKET_STATES.RECONNECTING);
           reconnectAttemptsRef.current += 1;
-          
+
           console.log(`🔄 Attempting to reconnect (${reconnectAttemptsRef.current}/${reconnectAttempts})...`);
-          
+
           reconnectTimeoutRef.current = setTimeout(() => {
             connect();
           }, reconnectInterval);
@@ -109,7 +111,7 @@ export const useSocket = (username, roomId, options = {}) => {
   // Disconnect from WebSocket
   const disconnect = useCallback(() => {
     isManuallyClosedRef.current = true;
-    
+
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = null;
@@ -241,10 +243,12 @@ export const useSocketEvents = (socket, eventHandlers = {}) => {
         break;
 
       case 'cursor:move':
+        console.log('🖱️ Cursor move:', message.data);
         onCursorMove?.(message.data);
         break;
 
       case 'cursor:update':
+        console.log('🖱️ Cursor update:', message.data);
         onCursorUpdate?.(message.data);
         break;
 

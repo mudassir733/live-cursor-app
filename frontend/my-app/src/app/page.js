@@ -1,23 +1,20 @@
-"use client"
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { Cursor } from "@/components/cursor";
-import { fetchAllCursors } from "@/lib/api";
 import { useOnlineUsers } from "@/hooks/useUserApi";
 import { useSocket, useCursorEvents } from "@/hooks/useSocket";
-
 import { useSearchParams } from "next/navigation";
 
 export default function Home() {
-  // Always call hooks in the same order, at the top
   const [username, setUsername] = useState(null);
   const [userId, setUserId] = useState(null);
-  const [cursors, setCursors] = useState([]); // [{ userId, username, x, y }]
+  const [cursors, setCursors] = useState([]);
   const searchParams = useSearchParams();
-  const roomId = searchParams.get("room") || "default"; // fallback to 'default' room
+  const roomId = searchParams.get("room") || "default";
   const socket = useSocket(username, roomId);
   const { sendCursorMove } = useCursorEvents(socket, userId);
   const { data: onlineUsers, isLoading: loadingUsers } = useOnlineUsers();
+  const lastMessageRef = useRef(null); // Track last processed message
 
   // Get current user info from localStorage
   useEffect(() => {
@@ -31,24 +28,6 @@ export default function Home() {
     }
   }, []);
 
-
-  // Real-time: update cursors from WebSocket events
-  useEffect(() => {
-    if (!username || !userId) return;
-    if (!socket || !socket.lastMessage) return;
-    if (
-      socket.lastMessage.type === "cursors:update" ||
-      socket.lastMessage.type === "connection:success"
-    ) {
-      // Expect an array: [{ userId, username, x, y }]
-      setCursors(socket.lastMessage.data?.cursors || []);
-    }
-  }, [username, userId, socket, socket?.lastMessage]);
-
-
-
-
-
   // Throttle function
   function throttle(fn, wait) {
     let last = 0;
@@ -60,24 +39,83 @@ export default function Home() {
       }
     };
   }
+
   // Handle real-time cursor broadcasting (throttled)
   useEffect(() => {
     if (!socket.isConnected || !userId) return;
     const throttledMove = throttle((e) => {
-      sendCursorMove({ userId, username, x: e.clientX, y: e.clientY });
+      const cursorData = { userId, username, x: e.clientX, y: e.clientY };
+      sendCursorMove(cursorData);
     }, 30);
     window.addEventListener("mousemove", throttledMove);
     return () => window.removeEventListener("mousemove", throttledMove);
   }, [socket.isConnected, userId, username, sendCursorMove]);
 
-  // Listen for cursor updates from socket
+  // Debounce state updates
+  const debounceSetCursors = useRef(
+    throttle((newCursors) => {
+      setCursors(newCursors);
+    }, 50) // Debounce to 50ms
+  ).current;
+
+  // Process WebSocket messages
   useEffect(() => {
-    if (!socket.lastMessage) return;
-    if (socket.lastMessage.type === "cursors:update" || socket.lastMessage.type === "connection:success") {
-      // Expect an array: [{ userId, username, x, y }]
-      setCursors(socket.lastMessage.data?.cursors || []);
+    if (!username || !userId || !socket || !socket.lastMessage) return;
+
+    const message = socket.lastMessage;
+    // Skip if message is identical to last processed
+    const messageStr = JSON.stringify(message);
+    if (lastMessageRef.current === messageStr) return;
+    lastMessageRef.current = messageStr;
+
+    // Log only in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Processing message:', messageStr);
     }
-  }, [socket.lastMessage]);
+
+    if (message.type === 'cursors:update' || message.type === 'connection:success') {
+      const cursors = message.data?.cursors || [];
+      const validCursors = cursors
+        .filter(cursor => cursor && cursor.userId && typeof cursor.x === 'number' && typeof cursor.y === 'number')
+        .map(cursor => ({
+          userId: cursor.userId,
+          username: cursor.username,
+          x: cursor.x,
+          y: cursor.y
+        }));
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Updating cursors from cursors:update/connection:success:', validCursors);
+      }
+      debounceSetCursors(validCursors);
+    } else if (message.type === 'cursor:move') {
+      const cursorData = message.data;
+      if (!cursorData?.userId) {
+        console.warn('Invalid cursor:move data:', cursorData);
+        return;
+      }
+      debounceSetCursors((prevCursors) => {
+        const newCursors = [...prevCursors];
+        const index = newCursors.findIndex((c) => c.userId === cursorData.userId);
+        if (index >= 0) {
+          newCursors[index] = { ...newCursors[index], x: cursorData.x, y: cursorData.y, username: cursorData.username };
+        } else {
+          newCursors.push({ userId: cursorData.userId, username: cursorData.username, x: cursorData.x, y: cursorData.y });
+        }
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Updated cursors:', newCursors);
+        }
+        return newCursors;
+      });
+    } else if (message.type === 'user:disconnected') {
+      debounceSetCursors((prevCursors) => {
+        const newCursors = prevCursors.filter((c) => c.userId !== message.data.userId);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('User disconnected, updated cursors:', newCursors);
+        }
+        return newCursors;
+      });
+    }
+  }, [username, userId, socket, socket.lastMessage, debounceSetCursors]);
 
   if (!username || !userId) {
     return (
@@ -91,7 +129,7 @@ export default function Home() {
     <div className="relative min-h-screen bg-gray-50">
       {/* Online Users List */}
       <div className="absolute left-4 top-4 z-20 bg-white rounded-xl shadow-lg p-4 flex flex-col items-center">
-        <h2 className="text-lg font-semibold mb-2">Online Users</h2>
+        <h2 className="text-lg font-semibold mb-2">Online users</h2>
         {loadingUsers ? (
           <div>Loading...</div>
         ) : (
@@ -108,7 +146,7 @@ export default function Home() {
           </div>
         )}
       </div>
-      {/* Render all cursors (Figma/Miro style) */}
+      {/* Render all cursors */}
       {cursors.map((c, idx) => (
         <div
           key={c.userId || `${c.username}-${idx}`}
@@ -134,9 +172,9 @@ export default function Home() {
               marginLeft: 8,
               background: c.userId === userId ? "#6366f1" : "#f43f5e",
               color: "white",
-              fontWeight: 600,
+              fontWeight: "bold",
               borderRadius: 6,
-              padding: "2px 8px",
+              padding: "2px 4px",
               fontSize: 14,
               boxShadow: c.userId === userId ? "0 2px 8px #6366f180" : "0 2px 8px #f43f5e40",
               border: c.userId === userId ? "2px solid #6366f1" : "2px solid #f43f5e",
