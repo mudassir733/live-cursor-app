@@ -16,9 +16,11 @@ class SocketEventHandler {
         eventEmitter.on('user:connected', this.handleUserConnectedEvent.bind(this));
         eventEmitter.on('user:disconnected', this.handleUserDisconnectedEvent.bind(this));
         eventEmitter.on('cursor:update', this.handleCursorUpdateEvent.bind(this));
+        eventEmitter.on('cursor:move', this.handleCursorMoveEvent.bind(this));
         eventEmitter.on('broadcast:update', this.handleBroadcastEvent.bind(this));
         eventEmitter.on('error', this.handleErrorEvent.bind(this));
     }
+
 
     // WebSocket connection handler
     async handleConnection(connection, request) {
@@ -54,6 +56,35 @@ class SocketEventHandler {
         }
     }
 
+
+    // Handle cursor movement (from client messages)
+    async handleCursorMove(cursorData, sessionId, user) {
+        try {
+            const roomId = this.sessionRooms.get(sessionId);
+            if (!cursorData || typeof cursorData.x !== 'number' || typeof cursorData.y !== 'number') {
+                throw new Error('Invalid cursor data');
+            }
+            // Store in memory and Redis
+            cursorStateManager.setCursor(roomId, sessionId, {
+                userId: user._id.toString(),
+                username: user.username,
+                x: cursorData.x,
+                y: cursorData.y
+            });
+            // Broadcast to room (via Redis pub/sub or direct)
+            eventEmitter.emitCursorMove(
+                { sessionId, username: user.username, userId: user._id.toString() },
+                { x: cursorData.x, y: cursorData.y }
+            );
+        } catch (error) {
+            eventEmitter.emitError(error, {
+                context: 'handleCursorMove',
+                sessionId,
+                username: user.username
+            });
+        }
+    }
+
     // Set up listeners for a specific connection
     setupConnectionListeners(connection, sessionId, user) {
         connection.on('message', (message) => {
@@ -64,10 +95,10 @@ class SocketEventHandler {
         });
         connection.on('error', (error) => {
             console.error(`Connection error for user ${user.username}:`, error);
-            eventEmitter.emitError(error, { 
-                context: 'connectionError', 
-                sessionId, 
-                username: user.username 
+            eventEmitter.emitError(error, {
+                context: 'connectionError',
+                sessionId,
+                username: user.username
             });
         });
         connection.on('pong', () => {
@@ -96,15 +127,15 @@ class SocketEventHandler {
                 case 'cursor:move':
                     await this.handleCursorMove(message.data, sessionId, user);
                     break;
-                
+
                 case 'cursor:update':
                     await this.handleCursorUpdate(message.data, sessionId, user);
                     break;
-                
+
                 case 'ping':
                     this.handlePing(sessionId);
                     break;
-                
+
                 default:
                     console.warn(`Unknown message type: ${message.type}`);
                     break;
@@ -112,10 +143,10 @@ class SocketEventHandler {
 
         } catch (error) {
             console.error('Error handling message:', error);
-            eventEmitter.emitError(error, { 
-                context: 'handleMessage', 
-                sessionId, 
-                username: user.username 
+            eventEmitter.emitError(error, {
+                context: 'handleMessage',
+                sessionId,
+                username: user.username
             });
         }
     }
@@ -130,12 +161,32 @@ class SocketEventHandler {
             // Emitting event for local listeners
             eventEmitter.emitCursorMove({ sessionId, username: user.username, userId: user._id }, cursorData);
         } catch (error) {
-            eventEmitter.emitError(error, { 
-                context: 'handleCursorMove', 
-                sessionId, 
-                username: user.username 
+            eventEmitter.emitError(error, {
+                context: 'handleCursorMove',
+                sessionId,
+                username: user.username
             });
         }
+    }
+
+
+    // Handle cursor:move event (triggered by client messages or Redis)
+    handleCursorMoveEvent({ user, cursor }) {
+        const roomId = this.sessionRooms.get(user.sessionId);
+        if (!roomId) {
+            console.warn(`No room found for session ${user.sessionId}`);
+            return;
+        }
+        console.log(`🖱️ Broadcasting cursor:move for ${user.username} in room ${roomId}`);
+        this.broadcastToRoom(roomId, {
+            type: 'cursor:move',
+            data: {
+                userId: user.userId,
+                username: user.username,
+                x: cursor.x,
+                y: cursor.y
+            }
+        });
     }
 
     // Handle cursor updates
@@ -145,10 +196,10 @@ class SocketEventHandler {
             cursorStateManager.setCursor(roomId, sessionId, cursorData);
             eventEmitter.emitCursorUpdate({ sessionId, username: user.username, userId: user._id }, cursorData);
         } catch (error) {
-            eventEmitter.emitError(error, { 
-                context: 'handleCursorUpdate', 
-                sessionId, 
-                username: user.username 
+            eventEmitter.emitError(error, {
+                context: 'handleCursorUpdate',
+                sessionId,
+                username: user.username
             });
         }
     }
@@ -173,7 +224,7 @@ class SocketEventHandler {
             if (roomId && user._id) {
                 const cursorStr = await require('../config/redis').redisPub.hget(`cursors:${roomId}`, user._id.toString());
                 if (cursorStr) {
-                    try { lastCursor = JSON.parse(cursorStr); } catch {}
+                    try { lastCursor = JSON.parse(cursorStr); } catch { }
                 }
             }
             // Persist last x/y to DB if available
@@ -193,10 +244,10 @@ class SocketEventHandler {
             });
         } catch (error) {
             console.error('Error handling close:', error);
-            eventEmitter.emitError(error, { 
-                context: 'handleClose', 
-                sessionId, 
-                username: user.username 
+            eventEmitter.emitError(error, {
+                context: 'handleClose',
+                sessionId,
+                username: user.username
             });
         }
     }
@@ -212,9 +263,22 @@ class SocketEventHandler {
         console.log(`❌ User disconnected event handled: ${userData.username}`);
     }
 
-    handleCursorUpdateEvent(data) {
-        // Additional logic for cursor updates
-        console.log(`🖱️ Cursor update event handled for: ${data.user.username}`);
+    handleCursorUpdateEvent({ user, cursor }) {
+        const roomId = this.sessionRooms.get(user.sessionId);
+        if (!roomId) {
+            console.warn(`No room found for session ${user.sessionId}`);
+            return;
+        }
+        console.log(`🖱️ Broadcasting cursor:move for ${user.username} in room ${roomId}`);
+        this.broadcastToRoom(roomId, {
+            type: 'cursor:move',
+            data: {
+                userId: user.userId,
+                username: user.username,
+                x: cursor.x,
+                y: cursor.y
+            }
+        });
     }
 
     handleBroadcastEvent(data) {
@@ -272,6 +336,49 @@ class SocketEventHandler {
         });
     }
 
+    // Broadcast to all clients in a specific room
+    broadcastToRoom(roomId, message) {
+        this.connections.forEach((connection, sessionId) => {
+            const clientRoomId = this.sessionRooms.get(sessionId);
+            if (clientRoomId === roomId && connection.readyState === connection.OPEN) {
+                this.sendToConnection(connection, message);
+            }
+        });
+    }
+
+
+    handleCursorUpdateEvent({ user, cursor }) {
+        try {
+            const roomId = this.sessionRooms.get(user.sessionId);
+            if (!roomId) {
+                console.warn(`No room found for session ${user.sessionId}`);
+                return;
+            }
+            console.log(`🖱️ Broadcasting cursor update for ${user.username} in room ${roomId}`);
+            // Broadcast cursor:move to all clients in the room
+            this.broadcastToRoom(roomId, {
+                type: 'cursor:move',
+                data: {
+                    userId: user.userId.toString(),
+                    username: user.username,
+                    x: cursor.x,
+                    y: cursor.y
+                }
+            });
+        } catch (error) {
+            console.error('Error handling cursor update event:', error);
+            eventEmitter.emitError(error, {
+                context: 'handleCursorUpdateEvent',
+                sessionId: user.sessionId,
+                username: user.username
+            });
+        }
+    }
+
+
+
+
+
     broadcastToOthers(excludeSessionId, message) {
         this.connections.forEach((connection, sessionId) => {
             if (sessionId !== excludeSessionId && connection.readyState === connection.OPEN) {
@@ -307,11 +414,11 @@ class SocketEventHandler {
         for (const [sessionId, user] of this.users) {
             await user.setOffline();
         }
-        
+
         // Clear local storage
         this.connections.clear();
         this.users.clear();
-        
+
         console.log('🧹 Socket event handler cleaned up');
     }
 }

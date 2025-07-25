@@ -94,6 +94,16 @@ class CursorEventEmitter extends EventEmitter {
         this.removeAllListeners(eventName);
         console.log(`🧹 Removed all listeners for event: ${eventName}`);
     }
+
+    emitCursorMove(userData, cursorData) {
+        console.log(`🖱️ Emitting cursor:move for ${userData.username}:`, cursorData);
+        this.emit('cursor:move', { user: userData, cursor: cursorData });
+    }
+
+    emitCursorUpdate(userData, cursorData) {
+        console.log(`🖱️ Emitting cursor:update for ${userData.username}:`, cursorData);
+        this.emit('cursor:update', { user: userData, cursor: cursorData });
+    }
 }
 
 // Create a singleton instance

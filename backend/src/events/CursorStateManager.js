@@ -14,10 +14,18 @@ class CursorStateManager extends EventEmitter {
     redisSub.on('message', (channel, message) => {
       try {
         const { roomId, sessionId, cursorState } = JSON.parse(message);
-        // Update local memory
         this.setCursor(roomId, sessionId, cursorState, false);
-        // Emit event for socket handler to broadcast
-        this.emit('cursorUpdate', { roomId, sessionId, cursorState, fromRedis: true });
+        this.emit('cursorUpdate', {
+          user: {
+            sessionId,
+            userId: cursorState.userId,
+            username: cursorState.username
+          },
+          cursor: {
+            x: cursorState.x,
+            y: cursorState.y
+          }
+        });
       } catch (err) {
         console.error('Redis pub/sub parse error:', err);
       }
@@ -27,42 +35,57 @@ class CursorStateManager extends EventEmitter {
   joinRoom(roomId, sessionId) {
     if (!this.rooms.has(roomId)) {
       this.rooms.set(roomId, new Map());
-      // Subscribe to Redis channel for this room only once
       redisSub.subscribe(`cursor:room:${roomId}`);
     }
-    this.rooms.get(roomId).set(sessionId, null);
+    // Initialize with default cursor state
+    this.rooms.get(roomId).set(sessionId, {
+      userId: null,
+      username: null,
+      x: 0,
+      y: 0
+    });
   }
-
   leaveRoom(roomId, sessionId) {
     if (this.rooms.has(roomId)) {
       this.rooms.get(roomId).delete(sessionId);
-      if (this.rooms.get(roomId).size === 0) this.rooms.delete(roomId);
+      if (this.rooms.get(roomId).size === 0) {
+        this.rooms.delete(roomId);
+        redisSub.unsubscribe(`cursor:room:${roomId}`);
+      }
     }
   }
 
   setCursor(roomId, sessionId, cursorState, publish = true) {
     if (!this.rooms.has(roomId)) this.rooms.set(roomId, new Map());
-    this.rooms.get(roomId).set(sessionId, cursorState);
+    // Ensure cursorState has all required fields
+    const cursor = {
+      userId: cursorState.userId || null,
+      username: cursorState.username || '',
+      x: Number(cursorState.x) || 0,
+      y: Number(cursorState.y) || 0
+    };
+    this.rooms.get(roomId).set(sessionId, cursor);
     if (publish) {
-      redisPub.publish(`cursor:room:${roomId}`, JSON.stringify({ roomId, sessionId, cursorState }));
-      console.log(`Published cursor update to Redis for room ${roomId}:`, cursorState);
+      redisPub.publish(`cursor:room:${roomId}`, JSON.stringify({ roomId, sessionId, cursorState: cursor }));
+      console.log(`Published cursor update to Redis for room ${roomId}:`, cursor);
     }
-    // Store latest cursor in Redis hash for this room keyed by userId
-    if (cursorState && cursorState.userId) {
-      // Always store userId, username, x, y as JSON
-      const redisCursor = {
-        userId: cursorState.userId,
-        username: cursorState.username || '',
-        x: cursorState.x,
-        y: cursorState.y
-      };
-      redisPub.hset(`cursors:${roomId}`, redisCursor.userId, JSON.stringify(redisCursor));
+    // Store in Redis hash
+    if (cursor.userId) {
+      redisPub.hset(`cursors:${roomId}`, cursor.userId, JSON.stringify(cursor));
     }
   }
-
   getCursors(roomId) {
-    return this.rooms.has(roomId) ? Array.from(this.rooms.get(roomId).entries()) : [];
+    if (!this.rooms.has(roomId)) return [];
+    return Array.from(this.rooms.get(roomId).values())
+      .filter(cursor => cursor && cursor.userId && typeof cursor.x === 'number' && typeof cursor.y === 'number')
+      .map(cursor => ({
+        userId: cursor.userId,
+        username: cursor.username,
+        x: cursor.x,
+        y: cursor.y
+      }));
   }
 }
+
 
 module.exports = new CursorStateManager();
