@@ -27,7 +27,7 @@ export function Cursor({ point, color, size, shadow, user }) {
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="drop-shadow-lg">
                     <path
                         d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.19841L11.7841 12.3673H5.65376Z"
-                        fill="blue"
+                        fill={user.cursorState?.color || "#000000"}
                         stroke="white"
                         strokeWidth="1"
                     />
@@ -36,7 +36,7 @@ export function Cursor({ point, color, size, shadow, user }) {
                 {/* User Label */}
                 <div
                     className="absolute left-6 top-2 bg-white rounded-lg shadow-lg border border-slate-200 pl-3 pr-7 py-2 whitespace-nowrap pointer-events-auto cursor-pointer transition-all duration-200 hover:shadow-xl"
-                    style={{ borderLeftColor: "blue", borderLeftWidth: "2px" }}
+                    style={{ borderLeftColor: user.cursorState?.color || "#000000", borderLeftWidth: "2px" }}
                 >
                     <div className="flex items-center space-x-2">
                         <img src={"/avatar.jpg"} alt={user.username} className="w-5 h-5 rounded-full" />

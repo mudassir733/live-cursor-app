@@ -31,7 +31,7 @@ export function OnlineUsersSidebar({ currentUserId }) {
                             />
                             <div
                                 className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white"
-                                style={{ backgroundColor: "red" }} // Use cursorState.color
+                                style={{ backgroundColor: user.cursorState?.color || "#000000" }} // Use cursorState.color
                             ></div>
                         </div>
 
