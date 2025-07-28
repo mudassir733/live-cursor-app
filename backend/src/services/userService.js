@@ -28,6 +28,7 @@ class UserService {
                     user.email = email;
                 }
                 user.lastSeen = new Date();
+                user.isOnline = true;
                 await user.save();
 
                 console.log(`Existing user logged in: ${username}`);
@@ -40,7 +41,7 @@ class UserService {
                 });
                 await user.save();
 
-                console.log(`✨ New user registered: ${username}`);
+                console.log(`New user registered: ${username}`);
                 eventEmitter.emit('user:registered', {
                     userId: user._id,
                     username: user.username
@@ -64,11 +65,11 @@ class UserService {
             };
 
         } catch (error) {
-            console.error('❌ Error in loginUser service:', error);
+            console.error('Error in loginUser service:', error);
             eventEmitter.emitError(error, { context: 'userService.loginUser' });
 
             if (error.code === 11000) {
-                // Duplicate key error
+
                 if (error.keyPattern.username) {
                     throw new Error('Username already exists');
                 }
@@ -187,27 +188,29 @@ class UserService {
      */
     async getOnlineUsers() {
         try {
-            const onlineUsers = await User.findOnlineUsers();
+            const onlineUsers = await User.find({ isOnline: true }).select('-__v').lean();
+
             return onlineUsers.map(user => ({
                 id: user._id,
                 username: user.username,
+                online: user.isOnline,
+                email: user.email,
                 avatar: user.avatar,
                 cursorState: user.cursorState,
                 lastSeen: user.lastSeen
             }));
 
         } catch (error) {
-            console.error('❌ Error in getOnlineUsers service:', error);
+            console.error('Error in getOnlineUsers service:', error);
             eventEmitter.emitError(error, { context: 'userService.getOnlineUsers' });
             throw error;
         }
     }
 
     /**
-     * Set user online status
-     * @param {string} userId - User ID
-     * @param {string} sessionId - Session ID
-     * @returns {Object} Updated user object
+     * @param {string} userId 
+     * @param {string} sessionId
+     * @returns {Object}
      */
     async setUserOnline(userId, sessionId) {
         try {
@@ -218,51 +221,24 @@ class UserService {
 
             await user.setOnline(sessionId);
 
-            // Update cache
+
             this.activeUsers.set(userId, user);
 
-            console.log(`🟢 User set online: ${user.username}`);
+            console.log(` User set online: ${user.username}`);
             return user;
 
         } catch (error) {
-            console.error('❌ Error in setUserOnline service:', error);
+            console.error('Error in setUserOnline service:', error);
             eventEmitter.emitError(error, { context: 'userService.setUserOnline' });
             throw error;
         }
     }
 
-    /**
-     * Set user offline status
-     * @param {string} userId - User ID
-     * @returns {Object} Updated user object
-     */
-    async setUserOffline(userId) {
-        try {
-            const user = await User.findById(userId);
-            if (!user) {
-                throw new Error('User not found');
-            }
-
-            await user.setOffline();
-
-            // Remove from cache
-            this.activeUsers.delete(userId);
-
-            console.log(`🔴 User set offline: ${user.username}`);
-            return user;
-
-        } catch (error) {
-            console.error('❌ Error in setUserOffline service:', error);
-            eventEmitter.emitError(error, { context: 'userService.setUserOffline' });
-            throw error;
-        }
-    }
 
     /**
-     * Update user cursor state
-     * @param {string} userId - User ID
-     * @param {Object} cursorState - Cursor state data
-     * @returns {Object} Updated user object
+     * @param {string} userId 
+     * @param {Object} cursorState 
+     * @returns {Object} 
      */
     async updateUserCursor(userId, cursorState) {
         try {

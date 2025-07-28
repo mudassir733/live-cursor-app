@@ -220,7 +220,7 @@ class UserController {
             });
 
         } catch (error) {
-            console.error('❌ Error in getOnlineUsers controller:', error);
+            console.error('Error in getOnlineUsers controller:', error);
 
             res.status(500).json({
                 success: false,
@@ -267,52 +267,6 @@ class UserController {
 
         } catch (error) {
             console.error('❌ Error in setUserOnline controller:', error);
-
-            let statusCode = 500;
-            let errorMessage = 'Internal server error';
-
-            if (error.message === 'User not found') {
-                statusCode = 404;
-                errorMessage = error.message;
-            }
-
-            res.status(statusCode).json({
-                success: false,
-                error: errorMessage
-            });
-        }
-    }
-
-    /**
-     * Set user offline status
-     * POST /api/users/:id/offline
-     */
-    async setUserOffline(req, res) {
-        try {
-            const { id } = req.params;
-
-            if (!id) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'User ID is required'
-                });
-            }
-
-            const user = await userService.setUserOffline(id);
-
-            res.status(200).json({
-                success: true,
-                user: {
-                    id: user._id,
-                    username: user.username,
-                    isOnline: user.isOnline,
-                    sessionId: user.sessionId
-                },
-                message: 'User set offline successfully'
-            });
-
-        } catch (error) {
-            console.error('❌ Error in setUserOffline controller:', error);
 
             let statusCode = 500;
             let errorMessage = 'Internal server error';

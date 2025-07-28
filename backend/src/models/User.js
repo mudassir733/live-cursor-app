@@ -58,7 +58,7 @@ const userSchema = new mongoose.Schema({
 }, {
     timestamps: true,
     toJSON: {
-        transform: function(doc, ret) {
+        transform: function (doc, ret) {
             delete ret.__v;
             return ret;
         }
@@ -69,57 +69,52 @@ const userSchema = new mongoose.Schema({
 // Instance methods
 // In-memory save queue for updateCursorState
 const updateCursorQueues = new Map();
-userSchema.methods.updateCursorState = async function(newState) {
+userSchema.methods.updateCursorState = async function (newState) {
     try {
-      await this.constructor.updateOne(
-        { _id: this._id },
-        {
-          $set: {
-            ...Object.entries(newState).reduce((acc, [key, val]) => {
-              acc[`cursorState.${key}`] = val;
-              return acc;
-            }, {}),
-            lastSeen: new Date()
-          }
-        }
-      );
-      // Update local instance to stay in sync (optional)
-      Object.assign(this.cursorState, newState);
-      this.lastSeen = new Date();
+        await this.constructor.updateOne(
+            { _id: this._id },
+            {
+                $set: {
+                    ...Object.entries(newState).reduce((acc, [key, val]) => {
+                        acc[`cursorState.${key}`] = val;
+                        return acc;
+                    }, {}),
+                    lastSeen: new Date()
+                }
+            }
+        );
+        // Update local instance to stay in sync (optional)
+        Object.assign(this.cursorState, newState);
+        this.lastSeen = new Date();
     } catch (err) {
-      console.error('updateCursorState error:', err);
+        console.error('updateCursorState error:', err);
     }
-  };
+};
 
-userSchema.methods.setOnline = function(sessionId) {
+userSchema.methods.setOnline = function (sessionId) {
     this.isOnline = true;
     this.sessionId = sessionId;
     this.lastSeen = new Date();
     return this.save();
 };
 
-userSchema.methods.setOffline = function() {
-    this.isOnline = false;
-    this.sessionId = null;
-    this.lastSeen = new Date();
-    return this.save();
-};
+
 
 // Static methods
-userSchema.statics.findOnlineUsers = function() {
+userSchema.statics.findOnlineUsers = function () {
     return this.find({ isOnline: true }).select('-__v');
 };
 
-userSchema.statics.findBySessionId = function(sessionId) {
+userSchema.statics.findBySessionId = function (sessionId) {
     return this.findOne({ sessionId }).select('-__v');
 };
 
-userSchema.statics.createOrUpdateUser = async function(userData) {
+userSchema.statics.createOrUpdateUser = async function (userData) {
     const { username, sessionId } = userData;
-    
+
     try {
         let user = await this.findOne({ username });
-        
+
         if (user) {
             user.isOnline = true;
             user.sessionId = sessionId;
@@ -135,7 +130,7 @@ userSchema.statics.createOrUpdateUser = async function(userData) {
             });
             await user.save();
         }
-        
+
         return user;
     } catch (error) {
         throw new Error(`Error creating/updating user: ${error.message}`);

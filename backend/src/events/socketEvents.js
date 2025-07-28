@@ -101,9 +101,7 @@ class SocketEventHandler {
                 username: user.username
             });
         });
-        connection.on('pong', () => {
-            this.updateUserLastSeen(sessionId);
-        });
+
     }
 
     // Handle incoming messages
@@ -232,7 +230,6 @@ class SocketEventHandler {
                 user.cursorState = { x: lastCursor.x, y: lastCursor.y };
                 await user.save();
             }
-            await user.setOffline();
             this.connections.delete(sessionId);
             this.users.delete(sessionId);
             this.sessionRooms.delete(sessionId);

@@ -16,7 +16,6 @@ router.put('/:id', userController.updateProfile);
 
 // User status routes
 router.post('/:id/online', userController.setUserOnline);
-router.post('/:id/offline', userController.setUserOffline);
 
 // Cursor state routes
 router.put('/:id/cursor', userController.updateCursor);

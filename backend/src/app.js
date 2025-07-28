@@ -15,7 +15,7 @@ class App {
         this.server = http.createServer(this.app);
         this.wsServer = null;
         this.socketHandler = new SocketEventHandler();
-        
+
         this.setupMiddleware();
         this.setupRoutes();
         this.setupWebSocket();
@@ -53,7 +53,7 @@ class App {
 
         // API routes
         this.app.use('/api/users', userRoutes);
-this.app.use('/api/cursors', cursorRoutes);
+        this.app.use('/api/cursors', cursorRoutes);
 
         // Root endpoint
         this.app.get('/', (req, res) => {
@@ -80,7 +80,7 @@ this.app.use('/api/cursors', cursorRoutes);
         // Error handling middleware
         this.app.use((error, req, res, next) => {
             console.error('🚨 Express Error:', error);
-            eventEmitter.emitError(error, { 
+            eventEmitter.emitError(error, {
                 context: 'expressError',
                 path: req.path,
                 method: req.method
@@ -95,9 +95,9 @@ this.app.use('/api/cursors', cursorRoutes);
 
     setupWebSocket() {
         // Initialize WebSocket server
-        this.wsServer = new WebSocketServer({ 
+        this.wsServer = new WebSocketServer({
             server: this.server,
-            perMessageDeflate: false // Disable compression for better performance
+            perMessageDeflate: false
         });
 
         // Set up WebSocket connection handler
@@ -107,29 +107,28 @@ this.app.use('/api/cursors', cursorRoutes);
 
         // Handle WebSocket server errors
         this.wsServer.on('error', (error) => {
-            console.error('❌ WebSocket Server Error:', error);
+            console.error('WebSocket Server Error:', error);
             eventEmitter.emitError(error, { context: 'wsServer' });
         });
 
-        console.log('🔌 WebSocket server initialized');
+        console.log(' WebSocket server initialized');
     }
 
     setupEventListeners() {
-        // Listen to application events
         eventEmitter.on('server:started', (data) => {
-            console.log('📊 Database integration active');
+            console.log(' Database integration active');
         });
 
         eventEmitter.on('user:connected', (userData) => {
-            console.log(`👋 Welcome ${userData.username}! (Session: ${userData.sessionId.substring(0, 8)}...)`);
+            console.log(`Welcome ${userData.username}! (Session: ${userData.sessionId.substring(0, 8)}...)`);
         });
 
         eventEmitter.on('user:disconnected', (userData) => {
-            console.log(`👋 Goodbye ${userData.username}! (Session: ${userData.sessionId.substring(0, 8)}...)`);
+            console.log(`Goodbye ${userData.username}! (Session: ${userData.sessionId.substring(0, 8)}...)`);
         });
 
         eventEmitter.on('error', (errorData) => {
-            console.error(`🚨 Application Error [${errorData.context.context || 'unknown'}]:`, errorData.error.message);
+            console.error(`Application Error [${errorData.context.context || 'unknown'}]:`, errorData.error.message);
         });
     }
 
@@ -141,24 +140,23 @@ this.app.use('/api/cursors', cursorRoutes);
     // Cleanup method
     async cleanup() {
         try {
-            // Close WebSocket server
+
             if (this.wsServer) {
-                console.log('🔌 Closing WebSocket connections...');
+                console.log(' Closing WebSocket connections...');
                 this.wsServer.close();
             }
 
-            // Cleanup socket handler
             if (this.socketHandler) {
                 await this.socketHandler.cleanup();
             }
 
-            console.log('🧹 App cleanup complete');
+            console.log(' App cleanup complete');
         } catch (error) {
-            console.error('❌ Error during app cleanup:', error);
+            console.error(' Error during app cleanup:', error);
         }
     }
 }
 
-// Create and export app instance
+
 const app = new App();
 module.exports = app;

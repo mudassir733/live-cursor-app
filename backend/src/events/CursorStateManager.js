@@ -12,8 +12,6 @@ class CursorStateManager extends EventEmitter {
   setupRedis() {
     redisSub.on('message', (channel, message) => {
       try {
-        console.log("Channel", channel);
-        console.log("Message", message);
         const { roomId, sessionId, cursorState } = JSON.parse(message);
         this.setCursor(roomId, sessionId, cursorState, false);
         this.emit('cursorUpdate', {
@@ -68,7 +66,6 @@ class CursorStateManager extends EventEmitter {
     this.rooms.get(roomId).set(sessionId, cursor);
     if (publish) {
       redisPub.publish(`cursor:room:${roomId}`, JSON.stringify({ roomId, sessionId, cursorState: cursor }));
-      console.log(`Published cursor update to Redis for room ${roomId}:`, cursor);
     }
     // Store in Redis hash
     if (cursor.userId) {
