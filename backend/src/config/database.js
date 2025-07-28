@@ -14,7 +14,7 @@ class DatabaseConnection {
             }
 
             const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/live-cursor-app';
-            
+
             await mongoose.connect(mongoUri);
 
             this.isConnected = true;

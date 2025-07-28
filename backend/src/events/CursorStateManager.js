@@ -1,11 +1,10 @@
-// CursorStateManager.js: In-memory and Redis pub/sub for cursor state
+
 const { redisPub, redisSub } = require('../config/redis');
 const EventEmitter = require('events');
 
 class CursorStateManager extends EventEmitter {
   constructor() {
     super();
-    // Map: roomId -> Map<sessionId, cursorState>
     this.rooms = new Map();
     this.setupRedis();
   }
@@ -13,6 +12,8 @@ class CursorStateManager extends EventEmitter {
   setupRedis() {
     redisSub.on('message', (channel, message) => {
       try {
+        console.log("Channel", channel);
+        console.log("Message", message);
         const { roomId, sessionId, cursorState } = JSON.parse(message);
         this.setCursor(roomId, sessionId, cursorState, false);
         this.emit('cursorUpdate', {
@@ -71,7 +72,9 @@ class CursorStateManager extends EventEmitter {
     }
     // Store in Redis hash
     if (cursor.userId) {
-      redisPub.hset(`cursors:${roomId}`, cursor.userId, JSON.stringify(cursor));
+      // redisPub.hset(`cursors:${roomId}`, cursor.userId, JSON.stringify(cursor));
+      // store in redis as json
+      redisPub.set(`cursor:${roomId}:${cursor.userId}`, JSON.stringify(cursor));
     }
   }
   getCursors(roomId) {

@@ -35,17 +35,17 @@ class UserController {
             res.status(200).json(result);
 
         } catch (error) {
-            console.error('❌ Error in login controller:', error);
-            
+            console.error('Error in login controller:', error);
+
             let statusCode = 500;
             let errorMessage = 'Internal server error';
 
-            if (error.message.includes('Username already exists') || 
+            if (error.message.includes('Username already exists') ||
                 error.message.includes('Email already exists')) {
-                statusCode = 409; 
+                statusCode = 409;
                 errorMessage = error.message;
             } else if (error.message.includes('Username must be')) {
-                statusCode = 400; 
+                statusCode = 400;
                 errorMessage = error.message;
             }
 
@@ -86,7 +86,7 @@ class UserController {
 
         } catch (error) {
             console.error('Error in getUserById controller:', error);
-            
+
             let statusCode = 500;
             let errorMessage = 'Internal server error';
 
@@ -135,7 +135,7 @@ class UserController {
 
         } catch (error) {
             console.error('Error in getUserByUsername controller:', error);
-            
+
             let statusCode = 500;
             let errorMessage = 'Internal server error';
 
@@ -183,7 +183,7 @@ class UserController {
 
         } catch (error) {
             console.error('❌ Error in updateProfile controller:', error);
-            
+
             let statusCode = 500;
             let errorMessage = 'Internal server error';
 
@@ -221,7 +221,7 @@ class UserController {
 
         } catch (error) {
             console.error('❌ Error in getOnlineUsers controller:', error);
-            
+
             res.status(500).json({
                 success: false,
                 error: 'Internal server error'
@@ -267,7 +267,7 @@ class UserController {
 
         } catch (error) {
             console.error('❌ Error in setUserOnline controller:', error);
-            
+
             let statusCode = 500;
             let errorMessage = 'Internal server error';
 
@@ -313,7 +313,7 @@ class UserController {
 
         } catch (error) {
             console.error('❌ Error in setUserOffline controller:', error);
-            
+
             let statusCode = 500;
             let errorMessage = 'Internal server error';
 
@@ -359,7 +359,7 @@ class UserController {
 
         } catch (error) {
             console.error('❌ Error in updateCursor controller:', error);
-            
+
             let statusCode = 500;
             let errorMessage = 'Internal server error';
 
@@ -390,7 +390,7 @@ class UserController {
 
         } catch (error) {
             console.error('❌ Error in getUserStats controller:', error);
-            
+
             res.status(500).json({
                 success: false,
                 error: 'Internal server error'
@@ -405,7 +405,7 @@ class UserController {
     async healthCheck(req, res) {
         try {
             const stats = await userService.getUserStats();
-            
+
             res.status(200).json({
                 success: true,
                 service: 'User Service',
@@ -416,7 +416,7 @@ class UserController {
 
         } catch (error) {
             console.error('❌ Error in user service health check:', error);
-            
+
             res.status(503).json({
                 success: false,
                 service: 'User Service',

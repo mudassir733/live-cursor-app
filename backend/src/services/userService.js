@@ -30,7 +30,7 @@ class UserService {
                 user.lastSeen = new Date();
                 await user.save();
 
-                console.log(`🔄 Existing user logged in: ${username}`);
+                console.log(`Existing user logged in: ${username}`);
             } else {
                 // Create new user
                 user = new User({
@@ -66,7 +66,7 @@ class UserService {
         } catch (error) {
             console.error('❌ Error in loginUser service:', error);
             eventEmitter.emitError(error, { context: 'userService.loginUser' });
-            
+
             if (error.code === 11000) {
                 // Duplicate key error
                 if (error.keyPattern.username) {
@@ -76,7 +76,7 @@ class UserService {
                     throw new Error('Email already exists');
                 }
             }
-            
+
             throw error;
         }
     }
@@ -103,7 +103,7 @@ class UserService {
             return user;
 
         } catch (error) {
-            console.error('❌ Error in getUserById service:', error);
+            console.error(' Error in getUserById service:', error);
             eventEmitter.emitError(error, { context: 'userService.getUserById' });
             throw error;
         }
@@ -124,7 +124,7 @@ class UserService {
             return user;
 
         } catch (error) {
-            console.error('❌ Error in getUserByUsername service:', error);
+            console.error(' Error in getUserByUsername service:', error);
             eventEmitter.emitError(error, { context: 'userService.getUserByUsername' });
             throw error;
         }
@@ -165,7 +165,7 @@ class UserService {
             // Update cache
             this.activeUsers.set(userId, user);
 
-            console.log(`📝 User profile updated: ${user.username}`);
+            console.log(`User profile updated: ${user.username}`);
             eventEmitter.emit('user:profileUpdated', {
                 userId: user._id,
                 username: user.username,
@@ -175,7 +175,7 @@ class UserService {
             return user;
 
         } catch (error) {
-            console.error('❌ Error in updateUserProfile service:', error);
+            console.error('Error in updateUserProfile service:', error);
             eventEmitter.emitError(error, { context: 'userService.updateUserProfile' });
             throw error;
         }
@@ -217,7 +217,7 @@ class UserService {
             }
 
             await user.setOnline(sessionId);
-            
+
             // Update cache
             this.activeUsers.set(userId, user);
 
@@ -244,7 +244,7 @@ class UserService {
             }
 
             await user.setOffline();
-            
+
             // Remove from cache
             this.activeUsers.delete(userId);
 
@@ -272,7 +272,7 @@ class UserService {
             }
 
             await user.updateCursorState(cursorState);
-            
+
             // Update cache
             this.activeUsers.set(userId, user);
 

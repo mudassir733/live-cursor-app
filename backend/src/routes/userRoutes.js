@@ -3,23 +3,23 @@ const userController = require('../controllers/userController');
 
 const router = express.Router();
 
-// User authentication routes
+
 router.post('/login', userController.login);
 
 // User profile routes
-router.get('/stats', userController.getUserStats); // Must be before /:id to avoid conflict
-router.get('/health', userController.healthCheck); // Health check endpoint
-router.get('/online', userController.getOnlineUsers); // Get online users
-router.get('/username/:username', userController.getUserByUsername); // Get user by username
-router.get('/:id', userController.getUserById); // Get user by ID
-router.put('/:id', userController.updateProfile); // Update user profile
+router.get('/stats', userController.getUserStats);
+router.get('/health', userController.healthCheck);
+router.get('/online', userController.getOnlineUsers);
+router.get('/username/:username', userController.getUserByUsername);
+router.get('/:id', userController.getUserById);
+router.put('/:id', userController.updateProfile);
 
 // User status routes
-router.post('/:id/online', userController.setUserOnline); // Set user online
-router.post('/:id/offline', userController.setUserOffline); // Set user offline
+router.post('/:id/online', userController.setUserOnline);
+router.post('/:id/offline', userController.setUserOffline);
 
 // Cursor state routes
-router.put('/:id/cursor', userController.updateCursor); // Update cursor state
+router.put('/:id/cursor', userController.updateCursor);
 
 // Route documentation endpoint
 router.get('/', (req, res) => {
