@@ -133,7 +133,6 @@ export const useSocket = (username, roomId, options = {}) => {
       try {
         const messageStr = typeof message === 'string' ? message : JSON.stringify(message);
         socketRef.current.send(messageStr);
-        console.log('📤 Message sent:', message);
         return true;
       } catch (error) {
         console.error('❌ Error sending message:', error);

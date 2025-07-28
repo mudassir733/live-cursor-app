@@ -5,26 +5,26 @@ import { queryKeys, mutationKeys } from '@/lib/queryClient';
 // Custom hook for user login/registration
 export const useUserLogin = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationKey: [mutationKeys.users.login],
     mutationFn: (userData) => apiMethods.user.login(userData),
     onSuccess: (response) => {
       const data = extractApiData(response);
-      
+
       // Store user data in localStorage
       if (data.user) {
         localStorage.setItem('user', JSON.stringify(data.user));
         localStorage.setItem('userId', data.user.id);
       }
-      
+
       // Invalidate and refetch user-related queries
       queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
-      
-      console.log('✅ User login successful:', data.user?.username);
+
+      console.log(' User login successful:', data.user?.username);
     },
     onError: (error) => {
-      console.error('❌ Login failed:', handleApiError(error));
+      console.error('Login failed:', handleApiError(error));
     },
   });
 };
@@ -55,31 +55,42 @@ export const useUserByUsername = (username, options = {}) => {
 
 // Custom hook for getting online users
 export const useOnlineUsers = (options = {}) => {
+
   return useQuery({
     queryKey: queryKeys.users.online(),
-    queryFn: () => apiMethods.user.getOnlineUsers(),
-    select: (response) => extractApiData(response).users,
-    refetchInterval: 1000 * 60 * 5,
-    staleTime: 1000 * 60 * 5, 
+    queryFn: async () => {
+      const response = await apiMethods.user.getOnlineUsers();
+      return response;
+    },
+    select: (response) => {
+      const data = extractApiData(response);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📋 Extracted users data:', data.users);
+      }
+      return data.users || [];
+    },
+    refetchInterval: 1000 * 60 * 2,
+    staleTime: 1000 * 30,
+    enabled: true,
+    refetchOnWindowFocus: true,
     ...options,
   });
 };
-
 // Custom hook for updating user profile
 export const useUpdateUserProfile = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationKey: [mutationKeys.users.updateProfile],
     mutationFn: ({ userId, data }) => apiMethods.user.updateProfile(userId, data),
     onSuccess: (response, variables) => {
       const data = extractApiData(response);
-      
+
       // Update user data in localStorage
       if (data.user) {
         localStorage.setItem('user', JSON.stringify(data.user));
       }
-      
+
       // Update specific user query
       queryClient.setQueryData(
         queryKeys.users.detail(variables.userId),
@@ -88,10 +99,10 @@ export const useUpdateUserProfile = () => {
           data: { ...oldData?.data, user: data.user }
         })
       );
-      
+
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: queryKeys.users.online() });
-      
+
       console.log('✅ Profile updated successfully');
     },
     onError: (error) => {
@@ -103,13 +114,13 @@ export const useUpdateUserProfile = () => {
 // Custom hook for setting user online
 export const useSetUserOnline = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationKey: [mutationKeys.users.setOnline],
     mutationFn: ({ userId, sessionId }) => apiMethods.user.setOnline(userId, sessionId),
     onSuccess: (response, variables) => {
       const data = extractApiData(response);
-      
+
       // Update user data
       queryClient.setQueryData(
         queryKeys.users.detail(variables.userId),
@@ -118,10 +129,10 @@ export const useSetUserOnline = () => {
           data: { ...oldData?.data, user: data.user }
         })
       );
-      
+
       // Invalidate online users query
       queryClient.invalidateQueries({ queryKey: queryKeys.users.online() });
-      
+
       console.log('✅ User set online successfully');
     },
     onError: (error) => {
@@ -133,13 +144,13 @@ export const useSetUserOnline = () => {
 // Custom hook for setting user offline
 export const useSetUserOffline = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationKey: [mutationKeys.users.setOffline],
     mutationFn: (userId) => apiMethods.user.setOffline(userId),
     onSuccess: (response, userId) => {
       const data = extractApiData(response);
-      
+
       // Update user data
       queryClient.setQueryData(
         queryKeys.users.detail(userId),
@@ -148,10 +159,10 @@ export const useSetUserOffline = () => {
           data: { ...oldData?.data, user: data.user }
         })
       );
-      
+
       // Invalidate online users query
       queryClient.invalidateQueries({ queryKey: queryKeys.users.online() });
-      
+
       console.log('✅ User set offline successfully');
     },
     onError: (error) => {
@@ -163,13 +174,13 @@ export const useSetUserOffline = () => {
 // Custom hook for updating cursor state
 export const useUpdateCursor = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationKey: [mutationKeys.users.updateCursor],
     mutationFn: ({ userId, cursorState }) => apiMethods.user.updateCursor(userId, cursorState),
     onSuccess: (response, variables) => {
       const data = extractApiData(response);
-      
+
       // Update user data
       queryClient.setQueryData(
         queryKeys.users.detail(variables.userId),
@@ -178,7 +189,7 @@ export const useUpdateCursor = () => {
           data: { ...oldData?.data, user: data.user }
         })
       );
-      
+
       // Invalidate online users query to update cursor positions
       queryClient.invalidateQueries({ queryKey: queryKeys.users.online() });
     },

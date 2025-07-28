@@ -4,9 +4,12 @@ import { Cursor } from "@/components/cursor";
 import { useOnlineUsers } from "@/hooks/useUserApi";
 import { useSocket, useCursorEvents } from "@/hooks/useSocket";
 import { useSearchParams } from "next/navigation";
+import { OnlineUsersSidebar } from "@/components/onlineUserSidebar";
+import { useCurrentUser } from "@/hooks/useUserApi";
 
 export default function Home() {
   const [username, setUsername] = useState(null);
+  const [users, setUser] = useState(null);
   const [userId, setUserId] = useState(null);
   const [cursors, setCursors] = useState([]);
   const searchParams = useSearchParams();
@@ -14,20 +17,20 @@ export default function Home() {
   const socket = useSocket(username, roomId);
   const { sendCursorMove } = useCursorEvents(socket, userId);
   const { data: onlineUsers, isLoading: loadingUsers } = useOnlineUsers();
-  const lastMessageRef = useRef(null); // Track last processed message
+  const lastMessageRef = useRef(null);
 
-  // Get current user info from localStorage
+
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
       const user = JSON.parse(storedUser);
+      setUser(user);
       setUsername(user.username);
       setUserId(user.id);
     } else {
       window.location.href = "/login";
     }
   }, []);
-
   // Throttle function
   function throttle(fn, wait) {
     let last = 0;
@@ -69,9 +72,9 @@ export default function Home() {
     lastMessageRef.current = messageStr;
 
     // Log only in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Processing message:', messageStr);
-    }
+    // if (process.env.NODE_ENV === 'development') {
+    //   console.log('Processing message:', messageStr);
+    // }
 
     if (message.type === 'cursors:update' || message.type === 'connection:success') {
       const cursors = message.data?.cursors || [];
@@ -101,17 +104,17 @@ export default function Home() {
         } else {
           newCursors.push({ userId: cursorData.userId, username: cursorData.username, x: cursorData.x, y: cursorData.y });
         }
-        if (process.env.NODE_ENV === 'development') {
-          console.log('Updated cursors:', newCursors);
-        }
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.log('Updated cursors:', newCursors);
+        // }
         return newCursors;
       });
     } else if (message.type === 'user:disconnected') {
       debounceSetCursors((prevCursors) => {
         const newCursors = prevCursors.filter((c) => c.userId !== message.data.userId);
-        if (process.env.NODE_ENV === 'development') {
-          console.log('User disconnected, updated cursors:', newCursors);
-        }
+        // if (process.env.NODE_ENV === 'development') {
+        //   console.log('User disconnected, updated cursors:', newCursors);
+        // }
         return newCursors;
       });
     }
@@ -126,26 +129,31 @@ export default function Home() {
   }
 
   return (
-    <div className="relative min-h-screen bg-gray-50">
-      {/* Online Users List */}
-      <div className="absolute left-4 top-4 z-20 bg-white rounded-xl shadow-lg p-4 flex flex-col items-center">
-        <h2 className="text-lg font-semibold mb-2">Online users</h2>
-        {loadingUsers ? (
-          <div>Loading...</div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {onlineUsers && onlineUsers.length > 0 ? (
-              onlineUsers.map((user) => (
-                <div key={user.id} className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-100 text-blue-700 font-bold border-2 border-blue-400">
-                  {user.username[0].toUpperCase()}
-                </div>
-              ))
-            ) : (
-              <div className="text-gray-400">No users online</div>
-            )}
+    <div className="relative min-h-screen bg-gray-50 overflow-hidden">
+
+      <header className="bg-white border-b border-slate-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">LC</span>
+            </div>
+            <h1 className="text-xl font-semibold text-slate-900">Live Cursor Workspace</h1>
           </div>
-        )}
-      </div>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm text-slate-600"> {onlineUsers?.length} users online</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <OnlineUsersSidebar currentUserId={userId} />
+
+
+
+
+
       {cursors.map((c, idx) => {
         const user = onlineUsers?.find((u) => u.id === c.userId) || {
           id: c.userId,
@@ -181,10 +189,6 @@ export default function Home() {
         );
       })}
       {/* Greeting */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white/80 rounded-xl px-8 py-4 shadow text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Hello, {username}</h1>
-        <div className="text-gray-600 text-sm">Move your mouse to see your live cursor!</div>
-      </div>
     </div>
   );
 }

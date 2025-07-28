@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
 
 // Create axios instance with default configuration
@@ -21,12 +21,12 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     // Log request in development
     if (process.env.NODE_ENV === 'development') {
       console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
     }
-    
+
     return config;
   },
   (error) => {
@@ -42,14 +42,14 @@ api.interceptors.response.use(
     if (process.env.NODE_ENV === 'development') {
       console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url}`, response.data);
     }
-    
+
     return response;
   },
   (error) => {
     // Handle common errors
     if (error.response) {
       const { status, data } = error.response;
-      
+
       switch (status) {
         case 401:
           // Unauthorized - clear auth token
@@ -73,7 +73,7 @@ api.interceptors.response.use(
     } else {
       console.error('❌ Request Setup Error:', error.message);
     }
-    
+
     return Promise.reject(error);
   }
 );
@@ -93,7 +93,7 @@ export const endpoints = {
     getStats: '/api/users/stats',
     health: '/api/users/health',
   },
-  
+
   // System endpoints
   health: '/health',
 };
@@ -113,7 +113,7 @@ export const apiMethods = {
     getStats: () => api.get(endpoints.users.getStats),
     healthCheck: () => api.get(endpoints.users.health),
   },
-  
+
   // System API methods
   system: {
     healthCheck: () => api.get(endpoints.health),
@@ -131,11 +131,11 @@ export const handleApiError = (error) => {
   if (error.response?.data?.error) {
     return error.response.data.error;
   }
-  
+
   if (error.message) {
     return error.message;
   }
-  
+
   return 'An unexpected error occurred';
 };
 
