@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const eventEmitter = require('./EventEmitter');
 const cursorStateManager = require('./CursorStateManager');
+const { generateRandomColor } = require('../utils/generateRandomColor');
 
 class SocketEventHandler {
     constructor() {
@@ -33,6 +34,13 @@ class SocketEventHandler {
             const sessionId = this.generateSessionId();
             // DB: only for presence
             const user = await User.createOrUpdateUser({ username, sessionId });
+
+            const randomColor = generateRandomColor();
+            // Set random color if not already set
+            if (!user.cursorState.color || user.cursorState.color === '#000000') {
+                user.cursorState.color = randomColor;
+                await user.save();
+            }
             this.connections.set(sessionId, connection);
             this.users.set(sessionId, user);
             this.sessionRooms.set(sessionId, roomId); // Track roomId for this session

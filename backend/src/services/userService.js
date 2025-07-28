@@ -1,15 +1,16 @@
 const User = require('../models/User');
 const eventEmitter = require('../events/EventEmitter');
+const { generateRandomColor } = require('../utils/generateRandomColor');
 
 class UserService {
     constructor() {
-        this.activeUsers = new Map(); // Cache for active users
+        this.activeUsers = new Map();
     }
 
     /**
-     * Login or register a user
-     * @param {Object} userData - User data containing username and optional email
-     * @returns {Object} User object and session info
+
+     * @param {Object} userData 
+     * @returns {Object} 
      */
     async loginUser(userData) {
         try {
@@ -19,16 +20,19 @@ class UserService {
                 throw new Error('Username must be at least 3 characters long');
             }
 
-            // Check if user already exists
             let user = await User.findOne({ username: username.trim() });
+            const randomColor = generateRandomColor();
 
             if (user) {
-                // User exists, update their info if needed
+
                 if (email && email !== user.email) {
                     user.email = email;
                 }
                 user.lastSeen = new Date();
                 user.isOnline = true;
+                if (!user.cursorState.color || user.cursorState.color === '#000000') {
+                    user.cursorState.color = randomColor;
+                }
                 await user.save();
 
                 console.log(`Existing user logged in: ${username}`);
@@ -48,7 +52,6 @@ class UserService {
                 });
             }
 
-            // Cache the user
             this.activeUsers.set(user._id.toString(), user);
 
             return {
@@ -59,7 +62,8 @@ class UserService {
                     email: user.email,
                     avatar: user.avatar,
                     joinedAt: user.joinedAt,
-                    lastSeen: user.lastSeen
+                    lastSeen: user.lastSeen,
+                    cursorState: user.cursorState
                 },
                 message: user.isNew ? 'User registered successfully' : 'User logged in successfully'
             };
