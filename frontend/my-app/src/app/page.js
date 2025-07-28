@@ -146,46 +146,40 @@ export default function Home() {
           </div>
         )}
       </div>
-      {/* Render all cursors */}
-      {cursors.map((c, idx) => (
-        <div
-          key={c.userId || `${c.username}-${idx}`}
-          style={{
-            position: "absolute",
-            left: c.x,
-            top: c.y,
-            zIndex: c.userId === userId ? 20 : 10,
-            pointerEvents: "none",
-            display: "flex",
-            alignItems: "center",
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <Cursor
-            point={[0, 0]}
-            color={c.userId === userId ? "#6366f1" : "#f43f5e"}
-            size={36}
-            shadow={c.userId === userId}
-          />
-          <span
+      {cursors.map((c, idx) => {
+        const user = onlineUsers?.find((u) => u.id === c.userId) || {
+          id: c.userId,
+          username: c.username,
+          avatar: "/placeholder.svg",
+          role: "Unknown",
+          status: "Unknown",
+        };
+
+        return (
+          <div
+            key={c.userId || `${c.username}-${idx}`}
             style={{
-              marginLeft: 8,
-              background: c.userId === userId ? "#6366f1" : "#f43f5e",
-              color: "white",
-              fontWeight: "bold",
-              borderRadius: 6,
-              padding: "2px 4px",
-              fontSize: 14,
-              boxShadow: c.userId === userId ? "0 2px 8px #6366f180" : "0 2px 8px #f43f5e40",
-              border: c.userId === userId ? "2px solid #6366f1" : "2px solid #f43f5e",
-              position: "relative",
-              top: 0,
+              position: "absolute",
+              left: c.x,
+              top: c.y,
+              zIndex: c.userId === userId ? 20 : 10,
+              pointerEvents: "none",
+              display: "flex",
+              alignItems: "center",
+              transform: "translate(-50%, -50%)",
             }}
           >
-            {c.username}
-          </span>
-        </div>
-      ))}
+            <Cursor
+              point={[0, 0]}
+              color={c.userId === userId ? "#6366f1" : "#f43f5e"}
+              size={36}
+              shadow={c.userId === userId}
+              user={user}
+            />
+
+          </div>
+        );
+      })}
       {/* Greeting */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-white/80 rounded-xl px-8 py-4 shadow text-center">
         <h1 className="text-2xl font-bold text-gray-900">Hello, {username}</h1>
