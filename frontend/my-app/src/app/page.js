@@ -120,6 +120,8 @@ export default function Home() {
     }
   }, [username, userId, socket, socket.lastMessage, debounceSetCursors]);
 
+
+
   if (!username || !userId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -147,6 +149,9 @@ export default function Home() {
           </div>
         </div>
       </header>
+
+
+
 
       <OnlineUsersSidebar currentUserId={userId} />
 
@@ -188,7 +193,7 @@ export default function Home() {
           </div>
         );
       })}
-      {/* Greeting */}
+
     </div>
   );
 }
